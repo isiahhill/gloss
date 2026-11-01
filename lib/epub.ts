@@ -322,7 +322,8 @@ export async function epubToArticle(file: File, parse: ParseMarkup, onProgress?:
     const root = parseDocument(parse, markup, "application/xhtml+xml");
     if (!root) continue;
     const body = find(root, "body")[0] ?? root;
-    const chapter = htmlToBlocks(body as never).filter((b) => b.type !== "figure");
+    // The web-article trimming would cut a chapter at a heading called "Notes" and drop a closing list; a book gets read whole.
+    const chapter = htmlToBlocks(body as never, undefined, { keepApparatus: true }).filter((b) => b.type !== "figure");
     if (!chapter.length) continue;
     const label = labels.get(item.href);
     if (label && chapter[0].type !== "h2" && chapter[0].type !== "h3" && label !== title) {

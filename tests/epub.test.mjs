@@ -259,6 +259,28 @@ test("a file cut short says so instead of surfacing a stream error", async () =>
   await assert.rejects(epubToArticle(asFile(hollow), parse), (e) => e instanceof EpubError && /damaged/.test(e.message));
 });
 
+test("end-of-chapter notes and a closing list survive; the article cleaner's footer trimming stays off for books", async () => {
+  const notes = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+<h1>Chapter Three</h1>
+${Array.from({ length: 5 }, (_, i) => `<p>${long("para" + i)}</p>`).join("\n")}
+<h2>Notes</h2>
+<ol>${Array.from({ length: 9 }, (_, i) => `<li>Note ${i + 1}, short.</li>`).join("")}</ol>
+</body></html>`;
+  const bytes = makeZip({
+    mimetype: "application/epub+zip",
+    "META-INF/container.xml": container("content.opf"),
+    "content.opf": `<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Notes Book</dc:title></metadata>
+      <manifest><item id="c" href="c.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c"/></spine></package>`,
+    "c.xhtml": notes,
+  });
+  const a = await epubToArticle(asFile(bytes), parse);
+  const text = a.blocks.map((b) => b.runs.map((r) => r.text).join(""));
+  assert.ok(text.includes("Notes"), "the Notes heading is kept");
+  assert.equal(a.blocks.filter((b) => b.type === "li").length, 9, "every note is kept");
+  assert.equal(text.at(-1), "Note 9, short.");
+});
+
 test("a chapter listed under two manifest ids is read once, and the whole import has one inflate budget", async () => {
   const files = {
     "META-INF/container.xml": container("b.opf"),
